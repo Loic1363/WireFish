@@ -1,4 +1,5 @@
 use crate::core::models::*;
+use chrono::Utc;
 
 pub fn parse_packet(raw: &[u8]) -> Option<Packet> {
     if raw.len() < 14 {
@@ -9,19 +10,23 @@ pub fn parse_packet(raw: &[u8]) -> Option<Packet> {
     let ethertype = u16::from_be_bytes([raw[12], raw[13]]);
 
     let eth = EthernetHeader {
-        src_mac: format!("{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}",
-            raw[6], raw[7], raw[8], raw[9], raw[10], raw[11]),
-        dst_mac: format!("{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}",
-            raw[0], raw[1], raw[2], raw[3], raw[4], raw[5]),
+        src_mac: format!(
+            "{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}",
+            raw[6], raw[7], raw[8], raw[9], raw[10], raw[11]
+        ),
+        dst_mac: format!(
+            "{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}",
+            raw[0], raw[1], raw[2], raw[3], raw[4], raw[5]
+        ),
         ethertype,
     };
 
-    // Simple IPv4 parsing
+    let timestamp = Utc::now().timestamp_millis() as u128;
+
+    // ⭐ CAS 1 : IPv4 (0x0800) → on parse proprement
     if ethertype == 0x0800 && raw.len() >= 34 {
-        let src_ip = format!("{}.{}.{}.{}",
-            raw[26], raw[27], raw[28], raw[29]);
-        let dst_ip = format!("{}.{}.{}.{}",
-            raw[30], raw[31], raw[32], raw[33]);
+        let src_ip = format!("{}.{}.{}.{}", raw[26], raw[27], raw[28], raw[29]);
+        let dst_ip = format!("{}.{}.{}.{}", raw[30], raw[31], raw[32], raw[33]);
 
         let protocol = raw[23];
 
@@ -32,14 +37,14 @@ pub fn parse_packet(raw: &[u8]) -> Option<Packet> {
         };
 
         let transport = match protocol {
-            6  => parse_tcp(raw),
+            6 => parse_tcp(raw),
             17 => parse_udp(raw),
-            1  => Some(TransportProtocol::Icmp),
-            _  => Some(TransportProtocol::Unknown)
+            1 => Some(TransportProtocol::Icmp),
+            _ => Some(TransportProtocol::Unknown),
         };
 
         return Some(Packet {
-            timestamp: chrono::Utc::now().timestamp_millis() as u128,
+            timestamp,
             eth: Some(eth),
             ip: Some(ip_header),
             transport,
@@ -47,13 +52,24 @@ pub fn parse_packet(raw: &[u8]) -> Option<Packet> {
         });
     }
 
-    None
+    // ⭐ CAS 2 : tout le reste (IPv6, ARP, etc.)
+    // → on renvoie quand même un Packet, sans IP/transport
+    Some(Packet {
+        timestamp,
+        eth: Some(eth),
+        ip: None,
+        transport: None,
+        payload: raw.to_vec(),
+    })
 }
 
 fn parse_tcp(raw: &[u8]) -> Option<TransportProtocol> {
+    if raw.len() < 38 {
+        return None;
+    }
     let src_port = u16::from_be_bytes([raw[34], raw[35]]);
     let dst_port = u16::from_be_bytes([raw[36], raw[37]]);
-    let flags = raw[47];
+    let flags = if raw.len() > 47 { raw[47] } else { 0 };
 
     Some(TransportProtocol::Tcp(TcpHeader {
         src_port,
@@ -63,6 +79,9 @@ fn parse_tcp(raw: &[u8]) -> Option<TransportProtocol> {
 }
 
 fn parse_udp(raw: &[u8]) -> Option<TransportProtocol> {
+    if raw.len() < 38 {
+        return None;
+    }
     let src_port = u16::from_be_bytes([raw[34], raw[35]]);
     let dst_port = u16::from_be_bytes([raw[36], raw[37]]);
 
