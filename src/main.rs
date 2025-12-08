@@ -9,6 +9,7 @@ use std::time::Duration;
 use crate::core::capture;
 use crate::core::classifier;
 use crate::core::models::Packet;
+use crate::core::storage;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum OutputMode {
@@ -17,11 +18,55 @@ enum OutputMode {
     Both,
 }
 
-// Flag global pour Ctrl+C
 static STOP_REQUESTED: AtomicBool = AtomicBool::new(false);
 
+fn fit_cell(s: &str, width: usize) -> String {
+    if s.len() <= width {
+        return s.to_string();
+    }
+    if width <= 1 {
+        return "…".to_string();
+    }
+    let mut tmp = s.to_string();
+    tmp.truncate(width - 1);
+    tmp.push('…');
+    tmp
+}
+
+fn parse_args_for_check() -> Option<u64> {
+    let mut args = std::env::args().skip(1);
+
+    let first = args.next()?;
+    if first != "check" {
+        return None;
+    }
+
+    let mut next = args.next();
+    if let Some(ref n) = next {
+        if n == "req" {
+            next = args.next();
+        }
+    }
+
+    let id_str = match next {
+        Some(s) => s,
+        None => {
+            eprintln!("Usage: wirefish check <id> ou wirefish check req <id>");
+            return Some(0); 
+        }
+    };
+
+    match id_str.parse::<u64>() {
+        Ok(id) => Some(id),
+        Err(_) => {
+            eprintln!("ID invalide : {id_str}");
+            Some(0)
+        }
+    }
+}
+
 fn parse_args() -> (OutputMode, Option<usize>) {
-    let mut mode = OutputMode::PacketsOnly; // défaut : juste la table des paquets
+    let mut mode = OutputMode::PacketsOnly;
     let mut iface_index: Option<usize> = None;
 
     for arg in std::env::args().skip(1) {
@@ -42,32 +87,12 @@ fn parse_args() -> (OutputMode, Option<usize>) {
     (mode, iface_index)
 }
 
-/// Tronque une chaîne pour qu’elle tienne dans `width` colonnes
-/// et ajoute "…" si c’est plus long.
-fn fit_cell(s: &str, width: usize) -> String {
-    if s.len() <= width {
-        return s.to_string();
-    }
-    if width <= 1 {
-        return "…".to_string();
-    }
-
-    let mut tmp = s.to_string();
-    // on garde width-1 caractères, on ajoute "…"
-    tmp.truncate(width - 1);
-    tmp.push('…');
-    tmp
-}
-
 fn listen_to_packets(rx: Receiver<Packet>, iface_name: String, mode: OutputMode) {
-    // En mode debug-only → on consomme juste le channel
     if mode == OutputMode::DebugOnly {
         for _ in rx.iter() {}
         return;
     }
 
-    // Largeur interne du cadre pour coller au header :
-    // "───────┬──────────────────────────────┬──────────────────────────────┬────────┬───────────────"
     const INNER_WIDTH: usize = 98;
     const COL_IP_WIDTH: usize = 30;
 
@@ -109,14 +134,12 @@ fn listen_to_packets(rx: Receiver<Packet>, iface_name: String, mode: OutputMode)
                     ("?".to_string(), "?".to_string(), false)
                 };
 
-                // on réduit les IP à COL_IP_WIDTH pour ne pas casser le tableau
-                let src = fit_cell(&src_raw, COL_IP_WIDTH);
-                let dst = fit_cell(&dst_raw, COL_IP_WIDTH);
-
-                // Filtre le bruit : pas d’IP + proto OTHER
                 if !has_ip && proto == "OTHER" {
                     continue;
                 }
+
+                let src = fit_cell(&src_raw, COL_IP_WIDTH);
+                let dst = fit_cell(&dst_raw, COL_IP_WIDTH);
 
                 println!(
                     "│ {:<5} │ {:<30} │ {:<30} │ {:<6} │ {:>4} B        │",
@@ -126,6 +149,8 @@ fn listen_to_packets(rx: Receiver<Packet>, iface_name: String, mode: OutputMode)
                     proto,
                     size,
                 );
+
+                storage::save_packet_for_inspect(count as u64, &iface_name, &proto, &packet);
 
                 thread::sleep(Duration::from_millis(5));
             }
@@ -142,7 +167,6 @@ fn listen_to_packets(rx: Receiver<Packet>, iface_name: String, mode: OutputMode)
     println!("└{}┘", "─".repeat(INNER_WIDTH));
 }
 
-/// Scan rapide puis choix interactif d’interface
 fn choose_device(devices: &[String]) -> Option<String> {
     println!("🔎 Scan rapide du trafic (≈ paquets / 0.5s)...\n");
 
@@ -152,7 +176,7 @@ fn choose_device(devices: &[String]) -> Option<String> {
         counts.push(c);
     }
 
-    println!("🧭 Interfaces détectées :");
+    println!("Interfaces détectées :");
     for (i, (dev, c)) in devices.iter().zip(counts.iter()).enumerate() {
         println!("  {i:>2} → {dev}   (~{c} pkts / 0.5s)");
     }
@@ -192,15 +216,22 @@ fn choose_device(devices: &[String]) -> Option<String> {
 }
 
 fn main() {
+    if let Some(id_or_zero) = parse_args_for_check() {
+        if id_or_zero != 0 {
+            storage::inspect_packet(id_or_zero);
+        }
+        return;
+    }
+
+    storage::reset_storage();
+
     let (mode, iface_index_arg) = parse_args();
 
-    // Handler Ctrl+C
     ctrlc::set_handler(|| {
         STOP_REQUESTED.store(true, Ordering::SeqCst);
     })
     .expect("Impossible d'installer le handler Ctrl+C");
 
-    // 1) Liste des devices
     let devices = capture::list_devices();
 
     if devices.is_empty() {
@@ -208,17 +239,16 @@ fn main() {
         return;
     }
 
-    // 2) Choix d'interface : via argument ou interactif
     let device = if let Some(idx) = iface_index_arg {
         if idx < devices.len() {
-            println!("🔧 Interface choisie via argument : {idx} → {}", devices[idx]);
+            println!("Interface choisie via argument : {idx} → {}", devices[idx]);
             devices[idx].clone()
         } else {
             eprintln!("❌ Index d'interface invalide ({idx}), bascule en mode interactif.\n");
             match choose_device(&devices) {
                 Some(d) => d,
                 None => {
-                    eprintln!("❌ Pas d'interface sélectionnée.");
+                    eprintln!("Pas d'interface sélectionnée.");
                     return;
                 }
             }
@@ -227,24 +257,21 @@ fn main() {
         match choose_device(&devices) {
             Some(d) => d,
             None => {
-                eprintln!("❌ Pas d'interface sélectionnée.");
+                eprintln!("Pas d'interface sélectionnée.");
                 return;
             }
         }
     };
 
-    println!("\n🔌 Capture sur {device}\n");
+    println!("\nCapture sur {device}\n");
 
-    // 3) Channel entre capture et affichage
     let (tx, rx) = unbounded::<Packet>();
 
-    // 4) Thread de capture
     let device_clone = device.clone();
     let debug_enabled = mode == OutputMode::DebugOnly || mode == OutputMode::Both;
     thread::spawn(move || {
         capture::capture_on(&device_clone, tx, debug_enabled);
     });
 
-    // 5) Affichage
     listen_to_packets(rx, device, mode);
 }

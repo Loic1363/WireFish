@@ -15,7 +15,6 @@ pub fn list_devices() -> Vec<String> {
         .collect()
 }
 
-/// Lightweight traffic scan: listen for `duration_ms` ms and count packets
 pub fn quick_peek(device_name: &str, duration_ms: u64) -> usize {
     let mut cap = match Capture::from_device(device_name)
         .and_then(|d| d.promisc(true).timeout(200).snaplen(65535).open())
@@ -44,7 +43,6 @@ pub fn quick_peek(device_name: &str, duration_ms: u64) -> usize {
     count
 }
 
-/// Remplit packet.ip (src/dst + protocole L4) à partir de la trame Ethernet
 fn fill_ip_from_l3(packet: &mut Packet, ether_type: u16, data: &[u8]) {
     match ether_type {
         0x0800 => {
@@ -55,7 +53,6 @@ fn fill_ip_from_l3(packet: &mut Packet, ether_type: u16, data: &[u8]) {
                 let header_len = ihl * 4;
 
                 if data.len() >= ip_start + header_len {
-                    // protocole L4 (TCP=6, UDP=17, ICMP=1, etc.)
                     let proto = data[ip_start + 9];
 
                     let src = Ipv4Addr::new(
@@ -74,17 +71,15 @@ fn fill_ip_from_l3(packet: &mut Packet, ether_type: u16, data: &[u8]) {
                     packet.ip = Some(IpHeader {
                         src_ip: src.to_string(),
                         dst_ip: dst.to_string(),
-                        protocol: proto, // <- u8
+                        protocol: proto,
                     });
                 }
             }
         }
 
         0x86DD => {
-            // IPv6
             if data.len() >= 14 + 40 {
                 let ip_start = 14;
-                // Next Header (équivalent protocol L4) = octet 6 de l’header IPv6
                 let next_header = data[ip_start + 6];
 
                 let src = Ipv6Addr::from([
@@ -103,17 +98,14 @@ fn fill_ip_from_l3(packet: &mut Packet, ether_type: u16, data: &[u8]) {
                 packet.ip = Some(IpHeader {
                     src_ip: src.to_string(),
                     dst_ip: dst.to_string(),
-                    protocol: next_header, // u8
+                    protocol: next_header, 
                 });
             }
         }
 
         0x0806 => {
-            // ARP (Ethernet+IPv4)
             if data.len() >= 14 + 28 {
                 let arp_start = 14;
-                // format ARP : hardware(2), proto(2), hlen(1), plen(1), op(2),
-                //             sender_mac(6), sender_ip(4), target_mac(6), target_ip(4)
                 let sender_ip = Ipv4Addr::new(
                     data[arp_start + 14],
                     data[arp_start + 15],
@@ -130,14 +122,12 @@ fn fill_ip_from_l3(packet: &mut Packet, ether_type: u16, data: &[u8]) {
                 packet.ip = Some(IpHeader {
                     src_ip: sender_ip.to_string(),
                     dst_ip: target_ip.to_string(),
-                    // ARP n’a pas de “protocol L4” → on met 0
                     protocol: 0,
                 });
             }
         }
 
         _ => {
-            // on laisse packet.ip = None pour les autres EtherTypes
         }
     }
 }
@@ -161,12 +151,10 @@ pub fn capture_on(device_name: &str, sender: Sender<Packet>, debug: bool) {
                 let data = &packet.data;
 
                 if debug {
-                    println!("🟢 [DEBUG] paquet brut capturé: {} octets", data.len());
+                    println!("[DEBUG] paquet brut capturé: {} octets", data.len());
                 }
 
-                // On parse comme avant
                 if let Some(mut parsed) = parse_packet(data) {
-                    // On extrait l'EtherType à partir de l’en-tête Ethernet
                     if data.len() >= 14 {
                         let ether_type = u16::from_be_bytes([data[12], data[13]]);
                         fill_ip_from_l3(&mut parsed, ether_type, data);
@@ -177,7 +165,7 @@ pub fn capture_on(device_name: &str, sender: Sender<Packet>, debug: bool) {
             }
             Err(Error::TimeoutExpired) => continue,
             Err(e) => {
-                eprintln!("❌ Erreur capture sur {device_name}: {e}");
+                eprintln!("Erreur capture sur {device_name}: {e}");
                 break;
             }
         }
