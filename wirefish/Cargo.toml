@@ -1,0 +1,28 @@
+[package]
+name = "wirefish"
+version = "0.1.0"
+edition = "2021"
+authors = ["WireFish Dev <wirefish@localhost>"]
+description = "WireFish — Live packet sniffer with classification and IP enrichment"
+license = "MIT"
+
+[dependencies]
+# Capture réseau multi-platforme (libpcap / npcap)
+pcap = "0.10"
+
+# Chrono pour timestamp millisecondes
+chrono = "0.4"
+
+# Channels thread-safe (multi-thread capture + analyse)
+crossbeam = "0.8"
+
+# Sérialisation JSON + derive pour structs
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# HTTP client pour infos IP (géoloc / réputation)
+reqwest = { version = "0.12", default-features = false, features = ["json", "blocking", "rustls-tls"] }
+
+# Optionnel mais recommandé pour debug propre
+log = "0.4"
+env_logger = "0.10"
