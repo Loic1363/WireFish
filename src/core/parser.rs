@@ -23,7 +23,7 @@ pub fn parse_packet(raw: &[u8]) -> Option<Packet> {
 
     let timestamp = Utc::now().timestamp_millis() as u128;
 
-    // ⭐ CAS 1 : IPv4 (0x0800) → on parse proprement
+    // Path 1: IPv4 (0x0800) with transport parsing
     if ethertype == 0x0800 && raw.len() >= 34 {
         let src_ip = format!("{}.{}.{}.{}", raw[26], raw[27], raw[28], raw[29]);
         let dst_ip = format!("{}.{}.{}.{}", raw[30], raw[31], raw[32], raw[33]);
@@ -52,8 +52,7 @@ pub fn parse_packet(raw: &[u8]) -> Option<Packet> {
         });
     }
 
-    // ⭐ CAS 2 : tout le reste (IPv6, ARP, etc.)
-    // → on renvoie quand même un Packet, sans IP/transport
+    // Path 2: other EtherTypes (IPv6/ARP/etc.) — return packet without IP/transport layers
     Some(Packet {
         timestamp,
         eth: Some(eth),

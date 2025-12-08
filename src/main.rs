@@ -17,10 +17,11 @@ enum OutputMode {
     Both,
 }
 
+// Flag global pour Ctrl+C
 static STOP_REQUESTED: AtomicBool = AtomicBool::new(false);
 
 fn parse_args() -> (OutputMode, Option<usize>) {
-    let mut mode = OutputMode::PacketsOnly; // défaut : que les paquets
+    let mut mode = OutputMode::PacketsOnly; // défaut : juste la table des paquets
     let mut iface_index: Option<usize> = None;
 
     for arg in std::env::args().skip(1) {
@@ -41,17 +42,34 @@ fn parse_args() -> (OutputMode, Option<usize>) {
     (mode, iface_index)
 }
 
+/// Tronque une chaîne pour qu’elle tienne dans `width` colonnes
+/// et ajoute "…" si c’est plus long.
+fn fit_cell(s: &str, width: usize) -> String {
+    if s.len() <= width {
+        return s.to_string();
+    }
+    if width <= 1 {
+        return "…".to_string();
+    }
+
+    let mut tmp = s.to_string();
+    // on garde width-1 caractères, on ajoute "…"
+    tmp.truncate(width - 1);
+    tmp.push('…');
+    tmp
+}
+
 fn listen_to_packets(rx: Receiver<Packet>, iface_name: String, mode: OutputMode) {
-    // Si on est en mode debug-only → on consomme juste le channel sans afficher de table
+    // En mode debug-only → on consomme juste le channel
     if mode == OutputMode::DebugOnly {
-        for _ in rx.iter() {
-            // on lit pour ne pas bloquer le thread capture, mais on n'affiche rien ici
-        }
+        for _ in rx.iter() {}
         return;
     }
 
-    // largeur interne du cadre (entre les deux │)
-    const INNER_WIDTH: usize = 78;
+    // Largeur interne du cadre pour coller au header :
+    // "───────┬──────────────────────────────┬──────────────────────────────┬────────┬───────────────"
+    const INNER_WIDTH: usize = 98;
+    const COL_IP_WIDTH: usize = 30;
 
     println!();
     println!("┌{}┐", "─".repeat(INNER_WIDTH));
@@ -67,19 +85,17 @@ fn listen_to_packets(rx: Receiver<Packet>, iface_name: String, mode: OutputMode)
     };
     println!("│{:<width$}│", iface_trimmed, width = INNER_WIDTH);
 
-    println!("├───────┬──────────────────────┬──────────────────────┬────────┬───────────────┤");
-    println!("│ #     │ Source IP            │ Destination IP       │ Proto  │ Size          │");
-    println!("├───────┼──────────────────────┼──────────────────────┼────────┼───────────────┤");
+    println!("├───────┬────────────────────────────────┬────────────────────────────────┬────────┬───────────────┤");
+    println!("│ #     │ Source IP                      │ Destination IP                 │ Proto  │ Size          │");
+    println!("├───────┼────────────────────────────────┼────────────────────────────────┼────────┼───────────────┤");
 
     let mut count: usize = 0;
 
     loop {
-        // si Ctrl+C → on sort proprement de la boucle
         if STOP_REQUESTED.load(Ordering::SeqCst) {
             break;
         }
 
-        // on attend un paquet avec timeout, pour pouvoir checker STOP_REQUESTED
         match rx.recv_timeout(Duration::from_millis(100)) {
             Ok(packet) => {
                 count += 1;
@@ -87,19 +103,23 @@ fn listen_to_packets(rx: Receiver<Packet>, iface_name: String, mode: OutputMode)
                 let proto = classifier::classify(&packet);
                 let size = packet.payload.len();
 
-                let (src, dst, has_ip) = if let Some(ip) = &packet.ip {
+                let (src_raw, dst_raw, has_ip) = if let Some(ip) = &packet.ip {
                     (ip.src_ip.clone(), ip.dst_ip.clone(), true)
                 } else {
                     ("?".to_string(), "?".to_string(), false)
                 };
 
-                // bruit : pas d'IP + proto OTHER → on n'affiche pas
+                // on réduit les IP à COL_IP_WIDTH pour ne pas casser le tableau
+                let src = fit_cell(&src_raw, COL_IP_WIDTH);
+                let dst = fit_cell(&dst_raw, COL_IP_WIDTH);
+
+                // Filtre le bruit : pas d’IP + proto OTHER
                 if !has_ip && proto == "OTHER" {
                     continue;
                 }
 
                 println!(
-                    "│ {:<5} │ {:<20} │ {:<20} │ {:<6} │ {:>4} B        │",
+                    "│ {:<5} │ {:<30} │ {:<30} │ {:<6} │ {:>4} B        │",
                     count,
                     src,
                     dst,
@@ -107,11 +127,9 @@ fn listen_to_packets(rx: Receiver<Packet>, iface_name: String, mode: OutputMode)
                     size,
                 );
 
-                // petite pause pour éviter un défilement illisible si gros trafic
                 thread::sleep(Duration::from_millis(5));
             }
-            Err(_timeout_or_closed) => {
-                // timeout → on regarde juste si Ctrl+C a été demandé
+            Err(_) => {
                 if STOP_REQUESTED.load(Ordering::SeqCst) {
                     break;
                 }
@@ -119,14 +137,12 @@ fn listen_to_packets(rx: Receiver<Packet>, iface_name: String, mode: OutputMode)
         }
     }
 
-
-    println!("├───────┴──────────────────────┴──────────────────────┴────────┴───────────────┤");
-    println!("│ Capture terminée (Ctrl+C)                                                    │");
-    println!("└──────────────────────────────────────────────────────────────────────────────┘");
+    println!("├───────┴────────────────────────────────┴────────────────────────────────┴────────┴───────────────┤");
+    println!("│{:<width$}│", " Capture terminée (Ctrl+C)", width = INNER_WIDTH);
+    println!("└{}┘", "─".repeat(INNER_WIDTH));
 }
 
-
-/// Scan rapide pour afficher (~ pkts / 0.5s) par interface puis demander à l'utilisateur
+/// Scan rapide puis choix interactif d’interface
 fn choose_device(devices: &[String]) -> Option<String> {
     println!("🔎 Scan rapide du trafic (≈ paquets / 0.5s)...\n");
 
@@ -178,12 +194,13 @@ fn choose_device(devices: &[String]) -> Option<String> {
 fn main() {
     let (mode, iface_index_arg) = parse_args();
 
-    // Handler Ctrl+C : on ne fait QUE demander l'arrêt
+    // Handler Ctrl+C
     ctrlc::set_handler(|| {
         STOP_REQUESTED.store(true, Ordering::SeqCst);
-    }).expect("Impossible d'installer le handler Ctrl+C");
+    })
+    .expect("Impossible d'installer le handler Ctrl+C");
 
-    // 1) Récupère la liste des devices Npcap
+    // 1) Liste des devices
     let devices = capture::list_devices();
 
     if devices.is_empty() {
@@ -191,7 +208,7 @@ fn main() {
         return;
     }
 
-    // 2) Choix d'interface : arg → sinon interactif
+    // 2) Choix d'interface : via argument ou interactif
     let device = if let Some(idx) = iface_index_arg {
         if idx < devices.len() {
             println!("🔧 Interface choisie via argument : {idx} → {}", devices[idx]);
@@ -216,10 +233,9 @@ fn main() {
         }
     };
 
-
     println!("\n🔌 Capture sur {device}\n");
 
-    // 3) Channel entre le thread de capture et l'affichage
+    // 3) Channel entre capture et affichage
     let (tx, rx) = unbounded::<Packet>();
 
     // 4) Thread de capture
@@ -229,6 +245,6 @@ fn main() {
         capture::capture_on(&device_clone, tx, debug_enabled);
     });
 
-    // 5) Thread principal : affichage des paquets (sauf si debug-only)
+    // 5) Affichage
     listen_to_packets(rx, device, mode);
 }

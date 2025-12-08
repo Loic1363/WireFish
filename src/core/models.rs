@@ -49,6 +49,6 @@ pub struct UdpHeader {
 pub struct IpReputation {
     pub ip: String,
     pub country: Option<String>,
-    pub score: u32, // 0 = safe, 100 = malicious
+    pub score: u32, // risk score (0 = safe, 100 = malicious)
     pub tags: Vec<String>,
 }

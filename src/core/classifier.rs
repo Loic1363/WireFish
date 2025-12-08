@@ -1,7 +1,7 @@
 use crate::core::models::{Packet, TransportProtocol};
 
 pub fn classify(packet: &Packet) -> String {
-    // Si on a une couche transport, on se base dessus
+    // Prefer transport-layer metadata when available
     if let Some(t) = &packet.transport {
         return match t {
             TransportProtocol::Tcp(tcp) => match tcp.dst_port {
@@ -21,7 +21,7 @@ pub fn classify(packet: &Packet) -> String {
         };
     }
 
-    // Sinon, on regarde juste l'EtherType
+    // Fallback on EtherType when transport info is absent
     if let Some(eth) = &packet.eth {
         return match eth.ethertype {
             0x0806 => "ARP".into(),

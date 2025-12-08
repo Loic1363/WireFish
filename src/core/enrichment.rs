@@ -6,7 +6,7 @@ pub fn query_ip_info(ip: &str) -> Option<IpReputation> {
 
     let client = Client::new();
 
-    // Exemple : services publics gratuits
+    // Example using a free public endpoint
     let url = format!("https://ipapi.co/{}/json/", ip);
 
     let resp = client.get(&url).send().ok()?.json::<serde_json::Value>().ok()?;

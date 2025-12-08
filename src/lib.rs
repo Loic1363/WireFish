@@ -7,11 +7,7 @@ pub mod core {
     pub mod models;
 }
 
-/// Public API pour WireFish
-///
-/// Exemple d’utilisation (depuis Tauri plus tard) :
-/// let devices = wirefish::devices();
-///
+/// Public API surface for embedders (e.g., Tauri)
 pub fn devices() -> Vec<String> {
     core::capture::list_devices()
 }

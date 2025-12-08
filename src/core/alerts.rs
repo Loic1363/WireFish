@@ -10,7 +10,7 @@ pub fn detect_suspicious(packet: &Packet, rep: Option<&IpReputation>) -> bool {
     }
 
     if let Some(ip) = &packet.ip {
-        // FTP brut
+        // Flag simple FTP control traffic
         if ip.protocol == 21 {
             return true;
         }
