@@ -30,11 +30,9 @@ pub fn quick_peek(device_name: &str, duration_ms: u64) -> usize {
                 count += 1;
             }
             Err(Error::TimeoutExpired) => {
-                // Pas grave, juste pas de paquet sur ce tick
                 continue;
             }
             Err(_) => {
-                // Autre erreur → on arrête
                 break;
             }
         }
@@ -43,7 +41,8 @@ pub fn quick_peek(device_name: &str, duration_ms: u64) -> usize {
     count
 }
 
-pub fn capture_on(device_name: &str, sender: Sender<Packet>) {
+/// boucle de capture : `debug` active ou non les logs "🟢 paquet brut"
+pub fn capture_on(device_name: &str, sender: Sender<Packet>, debug: bool) {
     let mut cap = Capture::from_device(device_name)
         .unwrap()
         .promisc(true)
@@ -52,26 +51,27 @@ pub fn capture_on(device_name: &str, sender: Sender<Packet>) {
         .open()
         .unwrap();
 
-    println!("🔁 [DEBUG] Capture loop started on {device_name}");
+    if debug {
+        println!("🔁 [DEBUG] Capture loop started on {device_name}");
+    }
 
     loop {
         match cap.next_packet() {
             Ok(packet) => {
-                println!(
-                    "🟢 [DEBUG] paquet brut capturé: {} octets",
-                    packet.data.len()
-                );
+                if debug {
+                    println!(
+                        "🟢 [DEBUG] paquet brut capturé: {} octets",
+                        packet.data.len()
+                    );
+                }
 
                 if let Some(parsed) = parse_packet(&packet.data) {
                     let _ = sender.send(parsed);
                 }
             }
-            Err(Error::TimeoutExpired) => {
-                // Juste un timeout, pas mortel
-                continue;
-            }
+            Err(Error::TimeoutExpired) => continue,
             Err(e) => {
-                eprintln!("🔴 [DEBUG] erreur capture sur {device_name}: {e}");
+                eprintln!("Erreur capture sur {device_name}: {e}");
                 break;
             }
         }

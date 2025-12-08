@@ -45,6 +45,7 @@ pub struct UdpHeader {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct IpReputation {
     pub ip: String,
     pub country: Option<String>,

@@ -1,7 +1,9 @@
 use crate::core::models::IpReputation;
 use reqwest::blocking::Client;
 
+#[allow(dead_code)]
 pub fn query_ip_info(ip: &str) -> Option<IpReputation> {
+
     let client = Client::new();
 
     // Exemple : services publics gratuits

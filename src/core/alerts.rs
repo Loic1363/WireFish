@@ -1,9 +1,7 @@
 use crate::core::models::{Packet, IpReputation};
 
+#[allow(dead_code)]
 pub fn detect_suspicious(packet: &Packet, rep: Option<&IpReputation>) -> bool {
-    // Nouvelle IP ?
-    // Score réputation ?
-    // Ports suspects ?
     
     if let Some(r) = rep {
         if r.score > 70 {
