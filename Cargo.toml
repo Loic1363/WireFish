@@ -9,6 +9,7 @@ license = "MIT"
 [dependencies]
 # Capture réseau multi-platforme (libpcap / npcap)
 pcap = "0.10"
+ctrlc = "3"
 
 # Chrono pour timestamp millisecondes
 chrono = "0.4"

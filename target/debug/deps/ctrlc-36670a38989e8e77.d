@@ -1,0 +1,11 @@
+C:\Users\FlowUP\VSCODE_CODE\WireFish\target\debug\deps\ctrlc-36670a38989e8e77.d: C:\Users\FlowUP\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\ctrlc-3.5.1\src\lib.rs C:\Users\FlowUP\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\ctrlc-3.5.1\src\error.rs C:\Users\FlowUP\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\ctrlc-3.5.1\src\platform\mod.rs C:\Users\FlowUP\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\ctrlc-3.5.1\src\platform\windows\mod.rs C:\Users\FlowUP\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\ctrlc-3.5.1\src\signal.rs
+
+C:\Users\FlowUP\VSCODE_CODE\WireFish\target\debug\deps\libctrlc-36670a38989e8e77.rlib: C:\Users\FlowUP\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\ctrlc-3.5.1\src\lib.rs C:\Users\FlowUP\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\ctrlc-3.5.1\src\error.rs C:\Users\FlowUP\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\ctrlc-3.5.1\src\platform\mod.rs C:\Users\FlowUP\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\ctrlc-3.5.1\src\platform\windows\mod.rs C:\Users\FlowUP\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\ctrlc-3.5.1\src\signal.rs
+
+C:\Users\FlowUP\VSCODE_CODE\WireFish\target\debug\deps\libctrlc-36670a38989e8e77.rmeta: C:\Users\FlowUP\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\ctrlc-3.5.1\src\lib.rs C:\Users\FlowUP\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\ctrlc-3.5.1\src\error.rs C:\Users\FlowUP\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\ctrlc-3.5.1\src\platform\mod.rs C:\Users\FlowUP\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\ctrlc-3.5.1\src\platform\windows\mod.rs C:\Users\FlowUP\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\ctrlc-3.5.1\src\signal.rs
+
+C:\Users\FlowUP\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\ctrlc-3.5.1\src\lib.rs:
+C:\Users\FlowUP\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\ctrlc-3.5.1\src\error.rs:
+C:\Users\FlowUP\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\ctrlc-3.5.1\src\platform\mod.rs:
+C:\Users\FlowUP\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\ctrlc-3.5.1\src\platform\windows\mod.rs:
+C:\Users\FlowUP\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\ctrlc-3.5.1\src\signal.rs:
