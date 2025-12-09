@@ -167,11 +167,9 @@ fn listen_to_packets(rx: Receiver<Packet>, iface_name: String, mode: OutputMode)
     println!("└{}┘", "─".repeat(INNER_WIDTH));
 }
 
-/// Écran de sélection d'interface, façon Wireshark (ASCII-only)
 fn choose_device(devices: &[String]) -> Option<String> {
     use std::cmp::max;
 
-    // Petit scan rapide (~0.5s) pour estimer l'activité
     let mut counts = Vec::new();
     for dev in devices {
         let c = capture::quick_peek(dev, 500);
@@ -189,7 +187,7 @@ fn choose_device(devices: &[String]) -> Option<String> {
     println!("╠════╪════════════════════════╪══════════════╪══════════════════════════════════╣");
 
     for (i, (dev, c)) in devices.iter().zip(counts.iter()).enumerate() {
-        // Barre “graphique” proportionnelle au trafic
+
         let bar_len = if max_count == 0 || *c == 0 {
             0
         } else {
@@ -268,7 +266,7 @@ fn main() {
     let devices = capture::list_devices();
 
     if devices.is_empty() {
-        eprintln!("❌ Aucun device réseau trouvé. (Npcap / droits admin ?)");
+        eprintln!("Aucun device réseau trouvé. (Npcap / droits admin ?)");
         return;
     }
 
