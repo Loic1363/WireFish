@@ -167,22 +167,54 @@ fn listen_to_packets(rx: Receiver<Packet>, iface_name: String, mode: OutputMode)
     println!("└{}┘", "─".repeat(INNER_WIDTH));
 }
 
+/// Écran de sélection d'interface, façon Wireshark (ASCII-only)
 fn choose_device(devices: &[String]) -> Option<String> {
-    println!("🔎 Scan rapide du trafic (≈ paquets / 0.5s)...\n");
+    use std::cmp::max;
 
+    // Petit scan rapide (~0.5s) pour estimer l'activité
     let mut counts = Vec::new();
     for dev in devices {
         let c = capture::quick_peek(dev, 500);
         counts.push(c);
     }
 
-    println!("Interfaces détectées :");
-    for (i, (dev, c)) in devices.iter().zip(counts.iter()).enumerate() {
-        println!("  {i:>2} → {dev}   (~{c} pkts / 0.5s)");
-    }
+    let max_count = counts.iter().copied().fold(0usize, max);
+    let bar_max_width: usize = 20;
 
     println!();
-    println!("Choisis l'interface à écouter (index, ex: 10 puis Entrée) :");
+    println!("╔═══════════════════════════════════════════════════════════════════════════════╗");
+    println!("║ WireFish – Capture interfaces                                                 ║");
+    println!("╠════╤════════════════════════╤══════════════╤══════════════════════════════════╣");
+    println!("║ Id │ Activity               │ pkts/0.5s    │ Interface                        ║");
+    println!("╠════╪════════════════════════╪══════════════╪══════════════════════════════════╣");
+
+    for (i, (dev, c)) in devices.iter().zip(counts.iter()).enumerate() {
+        // Barre “graphique” proportionnelle au trafic
+        let bar_len = if max_count == 0 || *c == 0 {
+            0
+        } else {
+            let ratio = *c as f32 / max_count as f32;
+            (ratio * bar_max_width as f32).ceil() as usize
+        };
+
+        let bar = if bar_len == 0 {
+            "·".to_string()
+        } else {
+            "█".repeat(bar_len)
+        };
+
+        println!(
+            "║ {:>2} │ {:<22} │ {:>5} pkts   │ {:<32} ║",
+            i,
+            bar,
+            c,
+            dev.chars().take(32).collect::<String>()
+        );
+    }
+
+    println!("╚════╧════════════════════════╧══════════════╧══════════════════════════════════╝");
+    println!();
+    println!("Choisis l'interface à écouter (index, ex: 3 puis Entrée) :");
 
     loop {
         print!("> ");
@@ -214,6 +246,7 @@ fn choose_device(devices: &[String]) -> Option<String> {
         }
     }
 }
+
 
 fn main() {
     if let Some(id_or_zero) = parse_args_for_check() {
